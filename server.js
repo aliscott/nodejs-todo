@@ -5,7 +5,8 @@ var server = require('http').createServer(app);
 var cookieParser = require('cookie-parser');
 var session = require('cookie-session');
 var config = require('./lib/config');
-var redis = require("redis");
+var redis = require('redis');
+var redisUrl = require('redis-url');
 var connect = require('connect');
 var methodOverride = require('method-override');
 var bodyParser = require('body-parser');
@@ -34,7 +35,17 @@ var client = null;
 if(dbType == 'riak') {
   client = new Riak.Client(process.env.RIAK_NODES.split(','));
 } else if(process.env.REDISTOGO_URL) { //heroku
-  client = require('redis-url').connect(process.env.REDISTOGO_URL);
+  var parsed = redisUrl.parse(process.env.REDISTOGO_URL)
+  if (parsed.protocol === 'rediss:') {
+    client = redis.createClient(parsed.port, parsed.hostname, {
+      auth_pass: parsed.password,
+      tls: {
+        servername: parsed.hostname, rejectUnauthorized: false
+      }
+    })
+  } else {
+    client = redisUrl.connect(process.env.REDISTOGO_URL);
+  }
 } else if(config.env == "development") {
   client = redis.createClient();
 }  else {
